@@ -567,5 +567,31 @@ def start_app():
             logger.exception("Bot crashed, retrying in 10s: %s", e)
             time.sleep(10)
 
+# ---------- HTTP server for Render port binding ----------
+def run_health_server():
+    """Run a simple HTTP server for Render's health checks"""
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    
+    class HealthHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header('Content-type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'Bot is running')
+        
+        def log_message(self, format, *args):
+            pass  # Suppress HTTP server logs
+    
+    port = int(os.getenv('PORT', 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthHandler)
+    logger.info(f"Health check server running on port {port}")
+    server.serve_forever()
+
 if __name__ == "__main__":
+    # Start health check server in background thread for Render
+    import threading
+    health_thread = threading.Thread(target=run_health_server, daemon=True)
+    health_thread.start()
+    
+    # Start the bot
     start_app()
