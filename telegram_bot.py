@@ -27,7 +27,7 @@ if sys.platform.startswith('win'):
 
 # ========== CONFIG ==========
 import os
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8552973630:AAFL3g6d_hMjKmqTQiP7ekmXt5iqDx5T1Uo")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "8585460498:AAH2E8l3RQGc8kh3H0-XSwqdD82uqmRpdq0")
 DB_PATH = 'ledger_plus_only.db'
 DEFAULT_RATE = 93.5
 # ============================
