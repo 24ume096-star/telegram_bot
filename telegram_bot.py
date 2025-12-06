@@ -539,59 +539,77 @@ async def reset_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-# ---------- app setup ----------
-def start_app():
-    if TELEGRAM_TOKEN is None or TELEGRAM_TOKEN.strip() == "" or TELEGRAM_TOKEN == "REPLACE_WITH_YOUR_TOKEN":
-        logger.error("Please edit TELEGRAM_TOKEN in the script.")
-        raise SystemExit("No token set")
+# ---------- app setup ----------import os
+import logging
+from flask import Flask, request
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler,
+    CallbackQueryHandler, filters
+)
 
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+# Your imports here:
+# from your_handlers import message_handler, rate_cmd, summary_cmd, ...
 
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), message_handler))
-    app.add_handler(CommandHandler('rate', rate_cmd))
-    app.add_handler(CommandHandler('summary', summary_cmd))
-    app.add_handler(CommandHandler('ledger', ledger_cmd))
-    app.add_handler(CommandHandler('myentries', myentries_cmd))
-    app.add_handler(CommandHandler('add', add_cmd))
-    app.add_handler(CommandHandler('undo', undo_cmd))
-    app.add_handler(CommandHandler('export', export_cmd))
-    app.add_handler(CommandHandler('reset', reset_cmd))
-    app.add_handler(CallbackQueryHandler(reset_callback, pattern='^reset_'))
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+WEBHOOK_URL = "https://telegram-bot-h9h7.onrender.com"  # your Render URL
 
-    logger.info("Starting bot (make sure privacy mode is disabled in BotFather).")
-    while True:
-        try:
-            app.run_polling()
-            break
-        except Exception as e:
-            logger.exception("Bot crashed, retrying in 10s: %s", e)
-            time.sleep(10)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ---------- HTTP server for Render port binding ----------
-def run_health_server():
-    """Run a simple HTTP server for Render's health checks"""
-    from http.server import HTTPServer, BaseHTTPRequestHandler
-    
-    class HealthHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
-            self.end_headers()
-            self.wfile.write(b'Bot is running')
-        
-        def log_message(self, format, *args):
-            pass  # Suppress HTTP server logs
-    
-    port = int(os.getenv('PORT', 10000))
-    server = HTTPServer(('0.0.0.0', port), HealthHandler)
-    logger.info(f"Health check server running on port {port}")
-    server.serve_forever()
+# ---------------- TELEGRAM APP ----------------
+
+app_bot = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+# Handlers (same as your code)
+app_bot.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), message_handler))
+app_bot.add_handler(CommandHandler('rate', rate_cmd))
+app_bot.add_handler(CommandHandler('summary', summary_cmd))
+app_bot.add_handler(CommandHandler('ledger', ledger_cmd))
+app_bot.add_handler(CommandHandler('myentries', myentries_cmd))
+app_bot.add_handler(CommandHandler('add', add_cmd))
+app_bot.add_handler(CommandHandler('undo', undo_cmd))
+app_bot.add_handler(CommandHandler('export', export_cmd))
+app_bot.add_handler(CommandHandler('reset', reset_cmd))
+app_bot.add_handler(CallbackQueryHandler(reset_callback, pattern='^reset_'))
+
+# ---------------- FLASK SERVER (For Webhook) ----------------
+
+flask_app = Flask(__name__)
+
+@flask_app.post("/")
+def telegram_webhook():
+    """Entry point for Telegram updates"""
+    data = request.get_json(force=True)
+    update = Update.de_json(data, app_bot.bot)
+    app_bot.create_task(app_bot.process_update(update))
+    return "OK", 200
+
+
+# ---------------- START WEBHOOK ----------------
 
 if __name__ == "__main__":
-    # Start health check server in background thread for Render
-    import threading
-    health_thread = threading.Thread(target=run_health_server, daemon=True)
-    health_thread.start()
-    
-    # Start the bot
-    start_app()
+    if not TELEGRAM_TOKEN:
+        raise SystemExit("TELEGRAM_TOKEN missing")
+
+    logger.info("Setting webhook...")
+
+    # remove old webhook (optional safety)
+    import requests
+    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
+
+    # set new webhook
+    webhook_set = requests.get(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+        f"?url={WEBHOOK_URL}"
+    ).json()
+
+    logger.info(f"Webhook set: {webhook_set}")
+
+    # Run Flask server for Render
+    flask_app.run(
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 10000)),
+    )
+
+   
