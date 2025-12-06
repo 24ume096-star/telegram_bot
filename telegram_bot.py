@@ -596,11 +596,11 @@ if __name__ == "__main__":
 
     # remove old webhook (optional safety)
     import requests
-    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/deleteWebhook")
+    requests.get(f"https://api.telegram.org/bot{8585460498:AAH2E8l3RQGc8kh3H0-XSwqdD82uqmRpdq0}/deleteWebhook")
 
     # set new webhook
     webhook_set = requests.get(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook"
+        f"https://api.telegram.org/bot{8585460498:AAH2E8l3RQGc8kh3H0-XSwqdD82uqmRpdq0}/setWebhook"
         f"?url={WEBHOOK_URL}"
     ).json()
 
